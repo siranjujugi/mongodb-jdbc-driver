@@ -2,7 +2,6 @@ package com.wisecoders.dbschema.mongodb;
 
 import com.wisecoders.dbschema.mongodb.wrappers.WrappedMongoClient;
 import com.wisecoders.dbschema.mongodb.wrappers.WrappedMongoDatabase;
-import org.graalvm.polyglot.Context;
 
 import java.sql.*;
 import java.util.List;
@@ -11,8 +10,9 @@ import java.util.Properties;
 import java.util.concurrent.Executor;
 
 /**
- * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with  <a href="https://dbschema.com">DbSchema Database Designer</a>
- * Free to use by everyone, code modifications allowed only to the  <a href="https://github.com/wise-coders/mongodb-jdbc-driver">public repository</a>
+ * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with DbSchema Database Designer https://dbschema.com
+ * Free to use by everyone, code modifications allowed only to
+ * the public repository https://github.com/wise-coders/mongodb-jdbc-driver
  */
 public class MongoConnection implements Connection
 {
@@ -26,10 +26,9 @@ public class MongoConnection implements Connection
 		this.client = client;
         setCatalog( client.getCurrentDatabaseName() );
 
-		try {
-			client.pingServer();
-		} catch ( Throwable ex ){
-			throw new SQLException( ex.getLocalizedMessage(), ex );
+        switch ( client.pingServer() ){
+			case FAILED : throw new SQLException("Connection to server failed.");
+			case TIMEOUT : throw new SQLException("Timeout connecting the server.");
 		}
 	}
 
@@ -352,7 +351,7 @@ public class MongoConnection implements Connection
 	}
 
 	/**
-	 * @return the URI
+	 * @return
 	 */
 	public String getUrl()
 	{
@@ -401,18 +400,5 @@ public class MongoConnection implements Connection
     public int getNetworkTimeout() throws SQLException {
         return 0;  
     }
-
-	private Context context;
-
-	public Context createContext(){
-		// System.setProperty("polyglot.engine.WarnInterpreterOnly", "false");
-		// Without this it doesn't find the JS or Truffle
-		Thread.currentThread().setContextClassLoader( Context.class.getClassLoader());
-		//https://github.com/oracle/graaljs/issues/214
-		if ( context == null ) {
-			context = Context.newBuilder("js").allowAllAccess(true).build();
-		}
-		return context;
-	}
 
 }

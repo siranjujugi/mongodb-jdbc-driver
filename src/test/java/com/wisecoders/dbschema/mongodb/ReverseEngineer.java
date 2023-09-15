@@ -81,42 +81,17 @@ public class ReverseEngineer extends AbstractTestCase {
                 "   }\n" +
                 "} )" );
 
-
-        stmt.execute("db.master.drop()");
-        stmt.execute("db.slave.drop()");
-
-        stmt.execute("db.master.insert( { _id: 1, item: \"box1\", qty: 21 } )");
-        stmt.execute("db.master.insert( {  item: \"box3\", qty: 23 } )");
-
-
-        stmt.execute("var itr = db.master.find().iterator()\n" +
-                "var oid = itr.next().get('_id')\n" +
-                "print(\"ObjectId rec1 \" + oid)\n" +
-                "db.slave.insert( { name: \"slave1\", master_id: oid } )\n" +
-
-                "var oid = itr.next().get('_id')\n" +
-                "print(\"ObjectId rec2 \" + oid)\n" +
-                "db.slave.insert( { name: \"slave2\", master_id: oid } )\n"
-        );
-
-        stmt.close();
-
+                stmt.close();
     }
 
     @Test
-    public void testReverseEngineer() throws SQLException {
-        ResultSet rs = con.getMetaData().getTables("tournament", "tournament", null, null );
+    public void testIndex() throws SQLException {
+        ResultSet rs = con.getMetaData().getTables("local", "local", null, null );
         while ( rs.next() ){
             String colName = rs.getString(3);
             printResultSet( con.getMetaData().getColumns("local", "local", colName, null));
             printResultSet( con.getMetaData().getColumns("tournament", "local", colName, null));
             printResultSet( con.getMetaData().getIndexInfo("local", "local", colName, false, false ));
         }
-        ResultSet rsf = con.getMetaData().getExportedKeys("tournament", "tournament", null);
-        while (rsf.next()) {
-            String colName = rsf.getString(3);
-        }
     }
-
-
 }

@@ -14,8 +14,9 @@ import java.util.logging.*;
  * Example :
  * jdbc:mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]
  *
- * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with  <a href="https://dbschema.com">DbSchema Database Designer</a>
- * Free to use by everyone, code modifications allowed only to the  <a href="https://github.com/wise-coders/mongodb-jdbc-driver">public repository</a>
+ * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with DbSchema Database Designer https://dbschema.com
+ * Free to use by everyone, code modifications allowed only to
+ * the public repository https://github.com/wise-coders/mongodb-jdbc-driver
  */
 public class JdbcDriver implements Driver
 {
@@ -26,16 +27,16 @@ public class JdbcDriver implements Driver
     static {
         try {
             DriverManager.registerDriver( new JdbcDriver());
-            LOGGER.setLevel(Level.ALL);
-
+            LOGGER.setLevel(Level.SEVERE);
             final ConsoleHandler consoleHandler = new ConsoleHandler();
-            consoleHandler.setLevel(Level.ALL);
+            consoleHandler.setLevel(Level.FINEST);
             consoleHandler.setFormatter(new SimpleFormatter());
+
+            LOGGER.setLevel(Level.FINEST);
             LOGGER.addHandler(consoleHandler);
 
             final FileHandler fileHandler = new FileHandler(System.getProperty("user.home") + "/.DbSchema/logs/MongoDbJdbcDriver.log");
             fileHandler.setFormatter( new SimpleFormatter());
-            fileHandler.setLevel(Level.ALL);
             LOGGER.addHandler(fileHandler);
 
         } catch ( Exception ex ){
@@ -52,55 +53,22 @@ public class JdbcDriver implements Driver
     @Override
     public Connection connect(String url, Properties info) throws SQLException {
         if ( url != null && acceptsURL( url )){
+            ScanStrategy scan = ScanStrategy.fast;
+            boolean expand = false;
+            for (ScanStrategy s : ScanStrategy.values() ){
+                if ( url.contains( "?scan=" + s ) || url.contains( "&scan=" + s )){
+                    scan = s;
+                    url = url.replaceFirst("\\?scan=" + s, "" ).replaceFirst("&scan=" + s, "");
+                }
+            }
+            if ( url.contains( "?expand=true" ) || url.contains( "&expand=true" )){
+                expand = true;
+                url = url.replaceFirst("\\?expand=true", "" ).replaceFirst("&expand=true", "");
+            }
             if ( url.startsWith("jdbc:")) {
                 url = url.substring("jdbc:".length());
             }
-            LOGGER.info("Connect URL: " + url );
-            int idx;
-            ScanStrategy scan = ScanStrategy.fast;
-            boolean expand = false, sortFields = false;
-            String trustStore = null, trustStorePassword = null;
-            String newUrl = url, urlWithoutParams = url;
-            if ( ( idx = url.indexOf("?")) > 0 ){
-                String paramsURL = url.substring( idx+1);
-                urlWithoutParams = url.substring( 0, idx );
-                StringBuilder sbParams = new StringBuilder();
-                for ( String pair: paramsURL.split("&")){
-                    String[] pairArr = pair.split("=");
-                    String key = pairArr.length == 2 ? pairArr[0].toLowerCase() : "";
-                    String value = pairArr.length == 2 ? pairArr[1] : "";
-                    switch( key ){
-                        case "scan": try { scan = ScanStrategy.valueOf( value);} catch ( IllegalArgumentException ex ){}
-                            LOGGER.info("ScanStrategy=" + scan);
-                            break;
-                        case "expand": expand = Boolean.parseBoolean( value); break;
-                        case "sort": sortFields = Boolean.parseBoolean( value); break;
-                        case "truststore": trustStore = value; break;
-                        case "truststorepassword": trustStorePassword = value; break;
-                        default:
-                            if ( sbParams.length() > 0 ) sbParams.append("&");
-                            sbParams.append( pair );
-                            break;
-                    }
-                }
-                newUrl = url.substring(0, idx) + "?" + sbParams;
-            }
-            if ( trustStore != null ){
-                System.setProperty("javax.net.ssl.trustStore", trustStore);
-            }
-            if ( trustStorePassword != null ){
-                System.setProperty("javax.net.ssl.trustStorePassword", trustStorePassword );
-            }
-            String databaseName = "admin";
-            if ( urlWithoutParams.endsWith("/")) {
-                urlWithoutParams = urlWithoutParams.substring( 0, urlWithoutParams.length()-1);
-            }
-            if ( ( idx = urlWithoutParams.lastIndexOf("/")) > 1 && urlWithoutParams.charAt( idx -1) != '/' ){
-                databaseName = urlWithoutParams.substring( idx + 1 );
-            }
-
-            LOGGER.info("MongoClient URL: " + url + " rewritten as " + newUrl );
-            final WrappedMongoClient client = new WrappedMongoClient(newUrl, info, databaseName, scan, expand, sortFields );
+            final WrappedMongoClient client = new WrappedMongoClient(url, info, scan, expand );
             return new MongoConnection(client);
         }
         return null;
@@ -108,7 +76,7 @@ public class JdbcDriver implements Driver
 
 
     /**
-     * URLs accepted are of the form: jdbc:mongodb[+srv]://&lt;server&gt;[:27017]/&lt;db-name&gt;
+     * URLs accepted are of the form: jdbc:mongodb[+srv]://<server>[:27017]/<db-name>
      *
      * @see java.sql.Driver#acceptsURL(java.lang.String)
      */

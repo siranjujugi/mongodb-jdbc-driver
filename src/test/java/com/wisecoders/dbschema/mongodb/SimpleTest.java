@@ -9,23 +9,23 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 /**
- * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with <a href="https://dbschema.com">DbSchema Database Designer</a>
+ * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with DbSchema Database Designer https://dbschema.com
  * Free to use by everyone, code modifications allowed only to
- * the <a href="https://github.com/wise-coders/mongodb-jdbc-driver">public repository</a>
+ * the public repository https://github.com/wise-coders/mongodb-jdbc-driver
  */
 
 public class SimpleTest extends AbstractTestCase{
 
     private Connection con;
 
-    private static final String urlWithAuth = "jdbc:mongodb://localhost:27017/local?scan=fast&authSource=local&connectTimeoutMS=1000";
+    private static final String urlWithAuth = "jdbc:mongodb://admin:mypassword@localhost:27017/local?authSource=local&connectTimeoutMS=1000";
     private static final String urlWithoutAuth = "jdbc:mongodb://localhost";
 
 
     @Before
     public void setUp() throws ClassNotFoundException, SQLException {
         Class.forName("com.wisecoders.dbschema.mongodb.JdbcDriver");
-        con = DriverManager.getConnection( urlWithAuth, null, null);
+        con = DriverManager.getConnection( urlWithoutAuth, null, null);
         Statement stmt=con.createStatement();
         stmt.execute("local.books.drop();");
         stmt.execute("local.booksView.drop();");
@@ -165,7 +165,7 @@ public class SimpleTest extends AbstractTestCase{
     public void testOID() throws Exception {
         Statement stmt=con.createStatement();
         stmt.execute("local.testObjectID.drop();");
-        printResultSet( stmt.executeQuery("local.testObjectID.insert({'_id':ObjectId('5e95cfecdfa8c111a4b2a53a'), 'name':'Lulu2'})"));
+        printResultSet( stmt.executeQuery("local.testObjectID.insert({'_id':ObjectId('5e95cfecdfa8c111a4b2a53a'), 'name':'Lulu'})"));
         stmt.close();
     }
 
