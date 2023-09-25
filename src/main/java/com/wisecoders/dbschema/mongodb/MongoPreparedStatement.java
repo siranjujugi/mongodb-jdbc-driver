@@ -80,6 +80,8 @@ public class MongoPreparedStatement implements PreparedStatement {
     private static final Pattern PATTERN_SHOW_USERS = Pattern.compile("SHOW\\s+USERS\\s*", Pattern.CASE_INSENSITIVE );
     private static final Pattern PATTERN_SHOW_RULES = Pattern.compile("SHOW\\s+RULES\\s*", Pattern.CASE_INSENSITIVE );
     private static final Pattern PATTERN_SHOW_PROFILES = Pattern.compile("SHOW\\s+PROFILES\\s*", Pattern.CASE_INSENSITIVE );
+    
+    private static final Pattern PATTERN_VALIDATION = Pattern.compile("SELECT\\s+1\\b", Pattern.CASE_INSENSITIVE );
 
     private static final String INITIALIZATION_SCRIPT = "var ObjectId = function( oid ) { return new org.bson.types.ObjectId( oid );}\n" +
             "var DBRef = function( colName, oid ) { return new com.mongodb.DBRef( colName, oid );} \n" + // I TRIED THIS BUT DOES NOT WORK
@@ -163,6 +165,12 @@ public class MongoPreparedStatement implements PreparedStatement {
                 throw new SQLException("Invalid command : " + plainQuery);
             }
         }
+        
+        //Added for checking the JDBC connection pool validation SQL
+        if (PATTERN_VALIDATION.matcher(plainQuery).matches()) {
+        	query = "db.runCommand({'ping':'1'})";
+        }
+        
         try {
             // //https://github.com/oracle/graaljs/issues/214
             Context context = Context.newBuilder("js").allowAllAccess(true).build();
@@ -370,13 +378,14 @@ public class MongoPreparedStatement implements PreparedStatement {
     @Override
     public int getQueryTimeout() throws SQLException {
         checkClosed();
-        throw new SQLFeatureNotSupportedException("MongoDB provides no support for query timeouts.");
+//        throw new SQLFeatureNotSupportedException("MongoDB provides no support for query timeouts.");
+        return -1;
     }
 
     @Override
     public void setQueryTimeout(final int seconds) throws SQLException {
         checkClosed();
-        throw new SQLFeatureNotSupportedException("MongoDB provides no support for query timeouts.");
+//        throw new SQLFeatureNotSupportedException("MongoDB provides no support for query timeouts.");
     }
 
     @Override
