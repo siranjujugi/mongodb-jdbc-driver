@@ -1,15 +1,14 @@
 package com.wisecoders.dbschema.mongodb.wrappers;
 
-import com.mongodb.ConnectionString;
+import com.wisecoders.dbschema.mongodb.ScanStrategy;
+import com.mongodb.MongoException;
 import com.mongodb.client.ListDatabasesIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoIterable;
-import com.wisecoders.dbschema.mongodb.ScanStrategy;
 import org.bson.BsonDocument;
 import org.bson.BsonInt64;
 import org.bson.Document;
-import org.bson.UuidRepresentation;
 import org.bson.conversions.Bson;
 
 import java.sql.SQLException;
@@ -19,8 +18,9 @@ import java.util.logging.Level;
 import static com.wisecoders.dbschema.mongodb.JdbcDriver.LOGGER;
 
 /**
- * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with  <a href="https://dbschema.com">DbSchema Database Designer</a>
- * Free to use by everyone, code modifications allowed only to the  <a href="https://github.com/wise-coders/mongodb-jdbc-driver">public repository</a>
+ * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with DbSchema Database Designer https://dbschema.com
+ * Free to use by everyone, code modifications allowed only to
+ * the public repository https://github.com/wise-coders/mongodb-jdbc-driver
  */
 public class WrappedMongoClient {
 
@@ -28,40 +28,34 @@ public class WrappedMongoClient {
     private final String databaseName;
     private final String uri;
     private final ScanStrategy scanStrategy;
-    public final boolean expandResultSet, sortFields;
+    public final boolean expandResultSet;
+    public enum PingStatus{ INIT, SUCCEED, FAILED, TIMEOUT }
 
-    public WrappedMongoClient(String uri, final Properties prop, final String databaseName, final ScanStrategy scanStrategy, boolean expandResultSet, boolean sortFields ){
-        final ConnectionString connectionString = new ConnectionString(uri){
-            @Override
-            public Integer getMaxConnectionIdleTime() {
-                return Integer.MAX_VALUE;
-            }
-
-            @Override
-            public UuidRepresentation getUuidRepresentation() {
-                return UuidRepresentation.STANDARD;
-            }
-        };
-        this.mongoClient = MongoClients.create(connectionString);
-        this.databaseName = databaseName;
+    public WrappedMongoClient(String uri, final Properties prop, final ScanStrategy scanStrategy, boolean expandResultSet ){
+        int i = uri.lastIndexOf("/" );
+        // THE SLASH IS USED TWO TIMES IN THE URL: mongdb://.... /dbname
+        if ( i < uri.indexOf( "://") + "://".length() + 1 ){
+            i = -1;
+        }
+        this.mongoClient = MongoClients.create( i > -1 ? uri.substring(0, i) : uri);
+        this.databaseName = i > -1 ? uri.substring(i + 1) : null;
         this.uri = uri;
         this.expandResultSet = expandResultSet;
         this.scanStrategy = scanStrategy;
-        this.sortFields = sortFields;
         getDatabaseNames();
     }
 
-    public boolean pingServer(){
-        mongoClient.listDatabaseNames();
-        Bson command = new BsonDocument("ping", new BsonInt64(1));
+    public PingStatus pingServer(){
         try {
-            mongoClient.getDatabase(databaseName != null && databaseName.length() > 0 ? databaseName : "admin").runCommand(command);
+            mongoClient.listDatabaseNames();
+            Bson command = new BsonDocument("ping", new BsonInt64(1));
+            mongoClient.getDatabase("admin").runCommand(command);
             LOGGER.info("Connected successfully to server.");
-            return true;
-        } catch ( Throwable ex ){}
-        mongoClient.getDatabase("admin").runCommand(command);
-        LOGGER.info("Connected successfully to server.");
-        return true;
+        } catch (MongoException me) {
+            LOGGER.info("An error occurred while attempting to run a command: " + me);
+            return PingStatus.FAILED;
+        }
+        return PingStatus.SUCCEED;
     }
 
     public void close(){
@@ -81,7 +75,7 @@ public class WrappedMongoClient {
     }
 
     // USE STATIC SO OPENING A NEW CONNECTION WILL REMEMBER THIS
-    public static final List<String> createdDatabases = new ArrayList<>();
+    public static final List<String> createdDatabases = new ArrayList<String>();
 
 
     public String getCurrentDatabaseName() {
@@ -90,7 +84,7 @@ public class WrappedMongoClient {
     }
 
     public List<String> getDatabaseNames() {
-        final List<String> names = new ArrayList<>();
+        final List<String> names = new ArrayList<String>();
         try {
             // THIS OFTEN THROWS EXCEPTION BECAUSE OF MISSING RIGHTS. IN THIS CASE WE ONLY ADD CURRENT KNOWN DB.
             for ( String dbName : listDatabaseNames() ){
@@ -113,13 +107,13 @@ public class WrappedMongoClient {
         if ( cachedDatabases.containsKey(dbName )){
             return cachedDatabases.get( dbName);
         }
-        WrappedMongoDatabase db = new WrappedMongoDatabase(mongoClient.getDatabase(dbName), scanStrategy, sortFields );
+        WrappedMongoDatabase db = new WrappedMongoDatabase(mongoClient.getDatabase(dbName), scanStrategy );
         cachedDatabases.put( dbName, db );
         return db;
     }
 
     public List<WrappedMongoDatabase> getDatabases() {
-        final List<WrappedMongoDatabase> list = new ArrayList<>();
+        final List<WrappedMongoDatabase> list = new ArrayList<WrappedMongoDatabase>();
 
         for ( String dbName : getDatabaseNames() ){
             list.add( getDatabase(dbName));
@@ -138,7 +132,7 @@ public class WrappedMongoClient {
 
 
     public List<String> getCollectionNames(String databaseName) throws SQLException {
-        final List<String> list = new ArrayList<>();
+        final List<String> list = new ArrayList<String>();
         try {
             WrappedMongoDatabase db = getDatabase(databaseName);
             if ( db != null ){
@@ -158,7 +152,7 @@ public class WrappedMongoClient {
     }
 
     public List<String> getViewNames(String databaseName) throws SQLException {
-        List<String> list = new ArrayList<>();
+        List<String> list = new ArrayList<String>();
         try {
             WrappedMongoDatabase db = getDatabase(databaseName);
             if ( db != null ){

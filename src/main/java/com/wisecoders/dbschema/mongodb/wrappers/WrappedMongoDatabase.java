@@ -1,84 +1,72 @@
 package com.wisecoders.dbschema.mongodb.wrappers;
 
+import com.mongodb.client.MongoCollection;
+import com.wisecoders.dbschema.mongodb.GraalConvertor;
+import com.wisecoders.dbschema.mongodb.ScanStrategy;
+import com.wisecoders.dbschema.mongodb.Util;
+import com.wisecoders.dbschema.mongodb.structure.MetaCollection;
+import com.wisecoders.dbschema.mongodb.structure.MetaDatabase;
+import com.wisecoders.dbschema.mongodb.structure.MetaField;
 import com.google.gson.GsonBuilder;
 import com.mongodb.client.ListCollectionsIterable;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.MongoIterable;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.ValidationOptions;
-import com.wisecoders.dbschema.mongodb.GraalConvertor;
-import com.wisecoders.dbschema.mongodb.ScanStrategy;
-import com.wisecoders.dbschema.mongodb.Util;
-import com.wisecoders.dbschema.mongodb.structure.MetaCollection;
-import com.wisecoders.dbschema.mongodb.structure.MetaDatabase;
 import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.graalvm.polyglot.proxy.ProxyObject;
 
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Level;
-
-import static com.wisecoders.dbschema.mongodb.JdbcDriver.LOGGER;
+import java.util.logging.Logger;
 
 
 /**
  * Wrapper class around MongoDatabase with direct access to collections as member variables.
  *
- * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with  <a href="https://dbschema.com">DbSchema Database Designer</a>
- * Free to use by everyone, code modifications allowed only to the  <a href="https://github.com/wise-coders/mongodb-jdbc-driver">public repository</a>
+ * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with DbSchema Database Designer https://dbschema.com
+ * Free to use by everyone, code modifications allowed only to
+ * the public repository https://github.com/wise-coders/mongodb-jdbc-driver
  */
 public class WrappedMongoDatabase implements ProxyObject {
 
     private final MongoDatabase mongoDatabase;
     private final ScanStrategy scanStrategy;
     public final MetaDatabase metaDatabase;
-    private final boolean sortFields;
 
-    WrappedMongoDatabase( MongoDatabase mongoDatabase, ScanStrategy scanStrategy, boolean sortFields ){
+    public static final Logger LOGGER = Logger.getLogger( WrappedMongoDatabase.class.getName() );
+
+    WrappedMongoDatabase( MongoDatabase mongoDatabase, ScanStrategy scanStrategy ){
         this.mongoDatabase = mongoDatabase;
         this.scanStrategy = scanStrategy;
         this.metaDatabase = new MetaDatabase(mongoDatabase.getName());
-        this.sortFields = sortFields;
-        try {
-            if ( !"config".equals(mongoDatabase.getName()) && !"admin".equals(mongoDatabase.getName()) && !"local".equals(mongoDatabase.getName())) {
-                for (Document info : mongoDatabase.listCollections()) {
-                    Document definition = (Document) Util.getByPath(info, "options.validator.$jsonSchema");
-                    if (definition != null) {
-                        final String name = info.getString("name");
-                        final MetaCollection metaCollection = metaDatabase.createMetaCollection(name, false);
-                        try {
-                            metaCollection.visitValidatorNode(null, true, definition, sortFields );
-                        } catch (Throwable ex) {
-                            LOGGER.log(Level.SEVERE, "Error parsing validation rule for " + name + "\n\n" + new GsonBuilder().setPrettyPrinting().create().toJson(definition) + "\n", ex);
-                            metaDatabase.dropMetaCollection(name);
-                        }
-                        metaCollection.scanIndexes(getCollection(name));
-                    }
+        for ( Document info : mongoDatabase.listCollections()){
+            Document definition = (Document) Util.getByPath(info, "options.validator.$jsonSchema");
+            if ( definition != null ){
+                final String name = info.getString("name");
+                final MetaCollection metaCollection = metaDatabase.createCollection( name );
+                LOGGER.log(Level.INFO, "--- Collection " + name + "\n\n" + new GsonBuilder().setPrettyPrinting().create().toJson(definition) + "\n"); ;
+                try {
+                    metaCollection.visitValidatorNode(null, true, definition);
+                } catch ( Throwable ex ){
+                    LOGGER.log(Level.SEVERE, "Error parsing validation rule.", ex );
+                    metaDatabase.dropCollection( name );
                 }
             }
-        } catch ( Throwable ex ){
-            LOGGER.log(Level.SEVERE, "Error listing database '" + mongoDatabase.getName() + "' collections\n\n", ex);
         }
-    }
-
-    public MetaCollection getMetaCollectionIfAlreadyLoaded( String collectionName) {
-        if (collectionName == null || collectionName.length() == 0) return null;
-
-        return metaDatabase.getMetaCollection(collectionName);
     }
 
 
     public MetaCollection getMetaCollection( String collectionName){
         if ( collectionName == null || collectionName.length() == 0 ) return null;
 
-        final MetaCollection metaCollection = metaDatabase.getMetaCollection(collectionName);
+        final MetaCollection metaCollection = metaDatabase.getCollection(collectionName);
         if (metaCollection == null) {
             try {
-                return metaDatabase.createMetaCollection( collectionName, true ).scanDocumentsAndIndexes( getCollection(collectionName), scanStrategy, sortFields );
+                return metaDatabase.createCollection( collectionName ).scanDocuments( getCollection(collectionName), scanStrategy );
             } catch ( Throwable ex ){
                 LOGGER.log(Level.SEVERE, "Error discovering collection " + mongoDatabase.getName() + "." + collectionName + ". ", ex );
             }
@@ -277,6 +265,36 @@ public class WrappedMongoDatabase implements ProxyObject {
         mongoDatabase.createCollection( s );
     }
 
+    public void discoverReferences(MetaCollection master ){
+        if ( !master.referencesDiscovered){
+            try {
+                master.referencesDiscovered = true;
+                final List<MetaField> unsolvedFields = new ArrayList<>();
+                final List<MetaField> solvedFields = new ArrayList<>();
+                master.collectFieldsWithObjectId(unsolvedFields);
+                if ( !unsolvedFields.isEmpty() ){
+                    for ( MetaCollection _metaCollection : metaDatabase.getCollections() ){
+                        final WrappedMongoCollection mongoCollection = getCollection( _metaCollection.name );
+                        if ( mongoCollection != null ){
+                            for ( MetaField metaField : unsolvedFields ){
+                                for ( ObjectId objectId : metaField.objectIds){
+                                    final Document query = new Document(); //new BasicDBObject();
+                                    query.put("_id", objectId);
+                                    if ( !solvedFields.contains( metaField ) && mongoCollection.find(query).iterator().hasNext()) {
+                                        solvedFields.add( metaField );
+                                        metaField.createReferenceTo(_metaCollection);
+                                        LOGGER.log(Level.INFO, "Found virtual relation  " + metaField.parentObject.name + " ( " + metaField.name + " ) ref " + _metaCollection.name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch ( Throwable ex ){
+                LOGGER.log( Level.SEVERE, "Error in discover foreign keys", ex );
+            }
+        }
+    }
 
 }
 

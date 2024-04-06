@@ -63,7 +63,7 @@ public class ResourceScripts extends AbstractTestCase {
         String line;
         final StringBuffer sb = new StringBuffer();
         while ((line = br.readLine()) != null) {
-            if ( !line.isBlank()) {
+            if ( !line.isEmpty()) {
                 sb.append(line).append("\n");
             }
             if ( line.trim().endsWith(";")){

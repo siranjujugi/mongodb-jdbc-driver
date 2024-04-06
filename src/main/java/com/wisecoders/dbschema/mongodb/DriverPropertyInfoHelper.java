@@ -4,8 +4,9 @@ import java.sql.DriverPropertyInfo;
 import java.util.ArrayList;
 
 /**
- * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with  <a href="https://dbschema.com">DbSchema Database Designer</a>
- * Free to use by everyone, code modifications allowed only to the  <a href="https://github.com/wise-coders/mongodb-jdbc-driver">public repository</a>
+ * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with DbSchema Database Designer https://dbschema.com
+ * Free to use by everyone, code modifications allowed only to
+ * the public repository https://github.com/wise-coders/mongodb-jdbc-driver
  */
 class DriverPropertyInfoHelper {
 
@@ -42,7 +43,7 @@ class DriverPropertyInfoHelper {
                 + "I/O socket read and write operations "
                 + "Socket.setSoTimeout(int) Default is 0 and means no timeout.", null);
 
-        return propInfos.toArray(new DriverPropertyInfo[0]);
+        return propInfos.toArray(new DriverPropertyInfo[propInfos.size()]);
     }
 
     private void addPropInfo(final ArrayList<DriverPropertyInfo> propInfos, final String propName,

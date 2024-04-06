@@ -1,81 +1,95 @@
 package com.wisecoders.dbschema.mongodb.structure;
 
+import com.mongodb.client.FindIterable;
+import com.mongodb.client.MongoCollection;
+import com.wisecoders.dbschema.mongodb.ScanStrategy;
+import com.wisecoders.dbschema.mongodb.wrappers.WrappedFindIterable;
+import com.wisecoders.dbschema.mongodb.wrappers.WrappedMongoCollection;
 import com.mongodb.client.ListIndexesIterable;
 import com.mongodb.client.MongoCursor;
-import com.wisecoders.dbschema.mongodb.ScanStrategy;
-import com.wisecoders.dbschema.mongodb.wrappers.WrappedMongoCollection;
 import org.bson.Document;
-import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
-
-import static com.wisecoders.dbschema.mongodb.JdbcDriver.LOGGER;
+import java.util.logging.Logger;
 
 /**
- * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with  <a href="https://dbschema.com">DbSchema Database Designer</a>
- * Free to use by everyone, code modifications allowed only to the  <a href="https://github.com/wise-coders/mongodb-jdbc-driver">public repository</a>
+ * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with DbSchema Database Designer https://dbschema.com
+ * Free to use by everyone, code modifications allowed only to
+ * the public repository https://github.com/wise-coders/mongodb-jdbc-driver
  */
 public class MetaCollection extends MetaObject {
 
+    public boolean referencesDiscovered = false;
     public final MetaDatabase metaDatabase;
-    public final boolean isVirtual;
 
     public final List<MetaIndex> metaIndexes = new ArrayList<>();
 
-    public MetaCollection( final MetaDatabase metaDatabase, final String name, boolean isVirtual) {
-        super(null, name );
+    public static final Logger LOGGER = Logger.getLogger( MetaCollection.class.getName() );
+
+    public MetaCollection( final MetaDatabase metaDatabase, final String name ){
+        super( null, name, "object", TYPE_OBJECT);
         this.metaDatabase = metaDatabase;
-        this.isVirtual = isVirtual;
-        setTypeName("object");
-        setJavaType( TYPE_OBJECT );
-        final MetaField idField = new MetaField(this, "_id" );
-        idField.setMandatory(true);
-        idField.setTypeClass( ObjectId.class );
-        fields.add(idField);
-        MetaIndex pkId = createMetaIndex( "_id_", true, false );
-        pkId.addColumn( idField );
     }
 
     public MetaIndex createMetaIndex(String name, boolean pk, boolean unique){
-        MetaIndex index = new MetaIndex( this, name, pk, unique );
+        MetaIndex index = new MetaIndex( this, name, "_id_".endsWith( name), false );
         metaIndexes.add( index );
         return index;
     }
 
-    public MetaCollection scanDocumentsAndIndexes(final WrappedMongoCollection mongoCollection, final ScanStrategy strategy, boolean sortFields ) {
-        scanDocuments( mongoCollection, strategy, sortFields );
+    public MetaCollection scanDocuments(final WrappedMongoCollection mongoCollection, final ScanStrategy strategy ) {
+        switch (strategy) {
+            case medium:
+                if (scanFirstDocuments( mongoCollection,500)) {
+                    scanRandomDocuments( mongoCollection,700);
+                }
+                break;
+            case full:
+                scanFirstDocuments( mongoCollection, Integer.MAX_VALUE);
+                break;
+            default:
+                if (scanFirstDocuments( mongoCollection,50)) {
+                    scanRandomDocuments( mongoCollection,150);
+                }
+                break;
+        }
         scanIndexes( mongoCollection );
         return this;
     }
 
-    private void scanDocuments(final WrappedMongoCollection mongoCollection, ScanStrategy strategy, boolean sortFields ) {
-        long scanStartTime = System.currentTimeMillis();
-        long cnt = scan(mongoCollection, strategy, true, sortFields);
-        if ( getFieldCount() < 400 && cnt == strategy.SCAN_COUNT && strategy != ScanStrategy.full ){
-            cnt +=scan(mongoCollection, strategy, false, sortFields);;
+
+
+    private boolean scanFirstDocuments(final WrappedMongoCollection mongoCollection, int iterations ) {
+        MongoCursor cursor = mongoCollection.find().iterator();
+        int iteration = 0;
+        while( cursor.hasNext() && ++iteration <= iterations ){
+            scanDocument( cursor.next());
         }
-        LOGGER.log( Level.INFO, "Scanned " + mongoCollection + " " + cnt + " documents, " + getFieldCount() + " fields in " + ( System.currentTimeMillis() - scanStartTime ) + "ms" );
+        cursor.close();
+        return iteration >= iterations;
     }
 
-    private long scan(WrappedMongoCollection mongoCollection, ScanStrategy strategy, boolean directionUp, boolean sortFields ) {
-        long cnt = 0;
-        try ( MongoCursor cursor = mongoCollection.find().sort("{_id:" + (directionUp ? "1" : "-1") + "}" ).iterator() ) {
-            while (cursor.hasNext() && cnt < strategy.SCAN_COUNT) {
-                scanDocument(cursor.next(), sortFields, 0);
-                cnt++;
+    private void scanRandomDocuments(final WrappedMongoCollection mongoCollection, int iterations ) {
+        int skip = 10, i = 0;
+        final WrappedFindIterable jFindIterable = mongoCollection.find(); // .limit(-1)
+        while ( i++ < iterations ){
+            final MongoCursor crs = jFindIterable.iterator();
+            while( i++ < iterations && crs.hasNext() ){
+                scanDocument( crs.next());
             }
+            jFindIterable.skip( skip );
+            skip = skip * 2;
         }
-        return cnt;
     }
 
     private static final String KEY_NAME = "name";
     private static final String KEY_UNIQUE = "unique";
     private static final String KEY_KEY = "key";
 
-    public void scanIndexes(final WrappedMongoCollection mongoCollection ){
+    private void scanIndexes(final WrappedMongoCollection mongoCollection ){
         try {
             ListIndexesIterable<Document> iterable = mongoCollection.listIndexes();
             for ( Object indexObject : iterable ){

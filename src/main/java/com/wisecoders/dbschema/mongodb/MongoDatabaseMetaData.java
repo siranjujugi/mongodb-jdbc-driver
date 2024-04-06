@@ -1,15 +1,16 @@
 package com.wisecoders.dbschema.mongodb;
 
-import com.wisecoders.dbschema.mongodb.resultSet.ArrayResultSet;
 import com.wisecoders.dbschema.mongodb.structure.*;
+import com.wisecoders.dbschema.mongodb.resultSet.ArrayResultSet;
 import com.wisecoders.dbschema.mongodb.wrappers.WrappedMongoDatabase;
 
 import java.sql.*;
 import java.util.List;
 
 /**
- * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with  <a href="https://dbschema.com">DbSchema Database Designer</a>
- * Free to use by everyone, code modifications allowed only to the  <a href="https://github.com/wise-coders/mongodb-jdbc-driver">public repository</a>
+ * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with DbSchema Database Designer https://dbschema.com
+ * Free to use by everyone, code modifications allowed only to
+ * the public repository https://github.com/wise-coders/mongodb-jdbc-driver
  */
 public class MongoDatabaseMetaData implements DatabaseMetaData
 {
@@ -18,6 +19,8 @@ public class MongoDatabaseMetaData implements DatabaseMetaData
     private final static ArrayResultSet EMPTY_RESULT_SET = new ArrayResultSet();
     private final static String OBJECT_ID_TYPE_NAME = "OBJECT_ID";
     private final static String DOCUMENT_TYPE_NAME = "DOCUMENT";
+
+
 
 
     MongoDatabaseMetaData(MongoConnection con) {
@@ -54,9 +57,9 @@ public class MongoDatabaseMetaData implements DatabaseMetaData
      */
     public ResultSet getTables( String catalogName, String schemaPattern, String tableNamePattern, String[] types) throws SQLException {
         ArrayResultSet resultSet = new ArrayResultSet();
-        resultSet.setColumnNames(new String[]{"TABLE_CAT", "TABLE_SCHEMA", "TABLE_NAME",
-                "TABLE_TYPE", "REMARKS", "TYPE_CAT", "TYPE_SCHEMA", "TYPE_NAME", "SELF_REFERENCING_COL_NAME",
-                "REF_GENERATION", "IS_VIRTUAL"});
+        resultSet.setColumnNames(new String[]{"TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME",
+                "TABLE_TYPE", "REMARKS", "TYPE_CAT", "TYPE_SCHEM", "TYPE_NAME", "SELF_REFERENCING_COL_NAME",
+                "REF_GENERATION"});
         if ( catalogName == null ){
             for ( String cat : con.client.getDatabaseNames() ) {
                 getTablesByCatalogName(cat, resultSet);
@@ -78,19 +81,18 @@ public class MongoDatabaseMetaData implements DatabaseMetaData
     }
 
     private String[] createTableRow( String catalogName, String tableName, String type ){
-        MetaCollection collection = con.client.getDatabase(catalogName).getMetaCollectionIfAlreadyLoaded(tableName);
-        String[] data = new String[11];
+        MetaCollection collection = con.client.getDatabase(catalogName).getMetaCollection(tableName);
+        String[] data = new String[10];
         data[0] = catalogName; // TABLE_CAT
-        data[1] = ""; // TABLE_SCHEMA
+        data[1] = ""; // TABLE_SCHEM
         data[2] = tableName; // TABLE_NAME
         data[3] = type; // TABLE_TYPE
         data[4] = collection != null ? collection.getDescription() : null; // REMARKS
         data[5] = ""; // TYPE_CAT
-        data[6] = ""; // TYPE_SCHEMA
+        data[6] = ""; // TYPE_SCHEM
         data[7] = ""; // TYPE_NAME
         data[8] = ""; // SELF_REFERENCING_COL_NAME
         data[9] = ""; // REF_GENERATION
-        data[10] = collection == null || collection.isVirtual ? "true" : "false";
         return data;
     }
 
@@ -107,10 +109,10 @@ public class MongoDatabaseMetaData implements DatabaseMetaData
         MetaCollection collection = con.client.getDatabase(catalogName).getMetaCollection(tableNamePattern);
 
         ArrayResultSet result = new ArrayResultSet();
-        result.setColumnNames(new String[] { "TABLE_CAT", "TABLE_SCHEMA", "TABLE_NAME", "COLUMN_NAME",
+        result.setColumnNames(new String[] { "TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME", "COLUMN_NAME",
                 "DATA_TYPE", "TYPE_NAME", "COLUMN_SIZE", "BUFFER_LENGTH", "DECIMAL_DIGITS", "NUM_PREC_RADIX",
                 "NULLABLE", "REMARKS", "COLUMN_DEF", "SQL_DATA_TYPE", "SQL_DATETIME_SUB", "CHAR_OCTET_LENGTH",
-                "ORDINAL_POSITION", "IS_NULLABLE", "SCOPE_CATALOG", "SCOPE_SCHEMA", "SCOPE_TABLE",
+                "ORDINAL_POSITION", "IS_NULLABLE", "SCOPE_CATLOG", "SCOPE_SCHEMA", "SCOPE_TABLE",
                 "SOURCE_DATA_TYPE", "IS_AUTOINCREMENT" });
 
         if ( collection != null ){
@@ -124,12 +126,12 @@ public class MongoDatabaseMetaData implements DatabaseMetaData
     }
 
     private void exportColumnsRecursive(MetaCollection collection, ArrayResultSet result, MetaField field) {
-        result.addRow(new String[] { collection.metaDatabase.name, // "TABLE_CAT",
+        result.addRow(new String[] { collection.name, // "TABLE_CAT",
                 null, // "TABLE_SCHEMA",
                 collection.name, // "TABLE_NAME", (i.e. MongoDB Collection Name)
                 field.getNameWithPath(), // "COLUMN_NAME",
-                "" + field.getJavaType(), // "DATA_TYPE",
-                field.getTypeName(), // "TYPE_NAME",
+                "" + field.type, // "DATA_TYPE",
+                field.typeName, // "TYPE_NAME",
                 "800", // "COLUMN_SIZE",
                 "0", // "BUFFER_LENGTH", (not used)
                 "0", // "DECIMAL_DIGITS",
@@ -241,7 +243,7 @@ public class MongoDatabaseMetaData implements DatabaseMetaData
             *  </OL>
         */
         ArrayResultSet result = new ArrayResultSet();
-        result.setColumnNames(new String[]{"TABLE_CAT", "TABLE_SCHEMA", "TABLE_NAME", "NON_UNIQUE",
+        result.setColumnNames(new String[]{"TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME", "NON_UNIQUE",
                 "INDEX_QUALIFIER", "INDEX_NAME", "TYPE", "ORDINAL_POSITION", "COLUMN_NAME", "ASC_OR_DESC",
                 "CARDINALITY", "PAGES", "FILTER_CONDITION"});
 
@@ -254,7 +256,7 @@ public class MongoDatabaseMetaData implements DatabaseMetaData
                         result.addRow(new String[] { collection.name, // "TABLE_CAT",
                                 null, // "TABLE_SCHEMA",
                                 collection.name, // "TABLE_NAME", (i.e. MongoDB Collection Name)
-                                index.unique ? "false" : "true", // "NON-UNIQUE",
+                                "YES", // "NON-UNIQUE",
                                 collection.name, // "INDEX QUALIFIER",
                                 index.name, // "INDEX_NAME",
                                 "0", // "TYPE",
@@ -1234,10 +1236,10 @@ public class MongoDatabaseMetaData implements DatabaseMetaData
                 "FKTABLE_NAME", "FKCOLUMN_NAME", "KEY_SEQ", "UPDATE_RULE", "DELETE_RULE", "FK_NAME", "PK_NAME", "DEFERRABILITY"});
 
         WrappedMongoDatabase db = con.client.getDatabase(catalogName);
-        db.metaDatabase.discoverReferences( db );
         MetaCollection pkCollection = db.getMetaCollection(tableNamePattern);
         if ( pkCollection != null ){
-                for (MetaCollection fromCollection : db.metaDatabase.getMetaCollections() ) {
+                for (MetaCollection fromCollection : db.metaDatabase.getCollections() ) {
+                    db.discoverReferences(fromCollection);
                     for (MetaField fromFiled : fromCollection.fields) {
                         getExportedKeysRecursive(result, pkCollection, fromCollection, fromFiled);
                     }
@@ -1262,7 +1264,7 @@ public class MongoDatabaseMetaData implements DatabaseMetaData
                         "1",//KEY_SEQ 1,2
                         ""+ DatabaseMetaData.importedKeyNoAction, //UPDATE_RULE
                         ""+DatabaseMetaData.importedKeyNoAction, //DELETE_RULE
-                        "Relationship", //FK_NAME
+                        "Virtual Relation", //FK_NAME
                         null, //PK_NAME
                         ""+DatabaseMetaData.importedKeyInitiallyImmediate //DEFERRABILITY
                 });
@@ -1288,8 +1290,8 @@ public class MongoDatabaseMetaData implements DatabaseMetaData
 
         WrappedMongoDatabase db = con.client.getDatabase(catalogName);
         MetaCollection fromCollection = db.getMetaCollection( tableNamePattern);
-        db.metaDatabase.discoverReferences( db );
         if ( fromCollection != null ){
+            db.discoverReferences(fromCollection);
             for ( MetaField fromFiled : fromCollection.fields ){
                 getImportedKeysRecursive(result, fromFiled);
             }
@@ -1312,7 +1314,7 @@ public class MongoDatabaseMetaData implements DatabaseMetaData
                     "1",//KEY_SEQ 1,2
                     ""+ DatabaseMetaData.importedKeyNoAction, //UPDATE_RULE
                     ""+DatabaseMetaData.importedKeyNoAction, //DELETE_RULE
-                    "Relationship", //FK_NAME
+                    "Virtual Relation", //FK_NAME
                     null, //PK_NAME
                     ""+DatabaseMetaData.importedKeyInitiallyImmediate //DEFERRABILITY
             });

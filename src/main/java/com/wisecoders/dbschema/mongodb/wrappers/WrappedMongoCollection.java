@@ -1,5 +1,6 @@
 package com.wisecoders.dbschema.mongodb.wrappers;
 
+import com.wisecoders.dbschema.mongodb.GraalConvertor;
 import com.mongodb.MongoNamespace;
 import com.mongodb.ReadConcern;
 import com.mongodb.ReadPreference;
@@ -9,7 +10,6 @@ import com.mongodb.client.*;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
-import com.wisecoders.dbschema.mongodb.GraalConvertor;
 import org.bson.BsonString;
 import org.bson.Document;
 import org.bson.codecs.configuration.CodecRegistry;
@@ -21,8 +21,9 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with  <a href="https://dbschema.com">DbSchema Database Designer</a>
- * Free to use by everyone, code modifications allowed only to the  <a href="https://github.com/wise-coders/mongodb-jdbc-driver">public repository</a>
+ * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with DbSchema Database Designer https://dbschema.com
+ * Free to use by everyone, code modifications allowed only to
+ * the public repository https://github.com/wise-coders/mongodb-jdbc-driver
  */
 public class WrappedMongoCollection<TDocument> {
 
@@ -35,18 +36,13 @@ public class WrappedMongoCollection<TDocument> {
         this.mongoCollection = mongoCollection;
     }
 
-    private static final long SCAN_FIRST_LAST = 100;
-
-
-
-
     private TDocument toDocument( Map map ){
         return (TDocument)( new Document( GraalConvertor.convertMap(map) ));
     }
 
     @Override
     public String toString() {
-        return mongoCollection.getNamespace().getFullName();
+        return mongoCollection.toString();
     }
 
     public Object explain(){
@@ -768,10 +764,10 @@ public class WrappedMongoCollection<TDocument> {
 
     public String createIndex(Map keys, Map options ) {
         IndexOptions indexOptions = new IndexOptions();
-        if ( options.containsKey(NAME_KEY)) indexOptions.name( options.get(NAME_KEY).toString() );
+        if ( options.containsKey( NAME_KEY)) indexOptions.name( options.get(NAME_KEY).toString() );
         if ( options.containsKey(PARTIAL_FILTER_EXPRESSION_KEY) ) indexOptions.partialFilterExpression( GraalConvertor.toBson(options.get( "partialFilterExpression")));
         if ( options.containsKey(SPARSE_KEY) && options.get( SPARSE_KEY) instanceof Boolean ) indexOptions.sparse( (Boolean) options.get(SPARSE_KEY));
-        if ( options.containsKey(UNIQUE_KEY) && options.get( UNIQUE_KEY) instanceof Boolean ) indexOptions.unique( (Boolean) options.get(UNIQUE_KEY));
+        if ( options.containsKey(UNIQUE_KEY) && options.get( UNIQUE_KEY) instanceof Boolean ) indexOptions.sparse( (Boolean) options.get(UNIQUE_KEY));
         if ( options.containsKey(EXPIRE_AFTER_SECONDS_KEY) && options.get( EXPIRE_AFTER_SECONDS_KEY) instanceof Number ) indexOptions.expireAfter( ((Number) options.get(EXPIRE_AFTER_SECONDS_KEY)).longValue(), TimeUnit.SECONDS );
         return mongoCollection.createIndex( GraalConvertor.toBson( keys ), indexOptions );
     }

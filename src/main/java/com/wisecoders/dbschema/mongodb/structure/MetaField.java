@@ -1,43 +1,41 @@
 package com.wisecoders.dbschema.mongodb.structure;
 
 
-import com.wisecoders.dbschema.mongodb.Util;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with  <a href="https://dbschema.com">DbSchema Database Designer</a>
- * Free to use by everyone, code modifications allowed only to the  <a href="https://github.com/wise-coders/mongodb-jdbc-driver">public repository</a>
+ * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with DbSchema Database Designer https://dbschema.com
+ * Free to use by everyone, code modifications allowed only to
+ * the public repository https://github.com/wise-coders/mongodb-jdbc-driver
  */
 public class MetaField {
 
     public final MetaObject parentObject;
-    public final String name;
-    private Class<?> typeClass;
-    private String typeName;
-    private int javaType = Integer.MIN_VALUE;
-    public ObjectId objectId;
-    public final List<MetaReference> references = new ArrayList<>();
+    public final String name, typeName;
+    public final List<ObjectId> objectIds = new ArrayList<ObjectId>();
+    public final int type;
+    public final List<MetaReference> references = new ArrayList<MetaReference>();
     private boolean mandatory = true;
     public String options;
     private String description;
 
 
-    MetaField(final MetaObject parentObject, final String name ){
+    MetaField(final MetaObject parentObject, final String name, final String typeName, int type ){
         this.parentObject = parentObject;
-        this.name = (name!= null ? name : "");
+        this.name = name;
+        this.typeName = typeName;
+        this.type = type;
+        if ( "bike_colour".equals(name))
+            System.out.println("Here");
     }
 
-    void setObjectId(ObjectId objectId){
-        if ( objectId != null ){
-            this.objectId = objectId;
+    void addObjectId(ObjectId objectId){
+        if ( objectIds.size() < 4 ){
+            objectIds.add( objectId );
         }
-    }
-
-    public ObjectId getObjectId(){
-        return objectId;
     }
 
     public String getNameWithPath(){
@@ -68,7 +66,7 @@ public class MetaField {
     }
 
     public void collectFieldsWithObjectId(List<MetaField> unsolvedFields) {
-        if ( objectId != null ){
+        if ( !objectIds.isEmpty() ){
             unsolvedFields.add(this);
         }
     }
@@ -103,56 +101,5 @@ public class MetaField {
 
     public String getDescription(){
         return description;
-    }
-
-    public int getFieldCount(){
-        return 1;
-    }
-
-    public void setTypeFromValue( Object value ){
-        if ( value != null ) {
-            Class<?> valueCls = value.getClass();
-            if ( typeClass == null ) {
-                typeClass = valueCls;
-            } else if (typeClass != valueCls) {
-                // valueCls is superclass or typeClass
-                if (valueCls.isAssignableFrom(typeClass)) typeClass = valueCls;
-                else if (!typeClass.isAssignableFrom(valueCls)) typeClass = Object.class;
-            }
-        }
-    }
-
-    public String getTypeName(){
-        if ( typeName != null ) {
-            return typeName;
-        }
-        if ( typeClass != null ) {
-            String type = typeClass.getName();
-            if ( "Boolean".equalsIgnoreCase(type )) {
-                type = "bool";
-            }
-            if (type.lastIndexOf('.') > 0) type = type.substring(type.lastIndexOf('.') + 1);
-            return type;
-        }
-        return "string";
-    }
-
-    public void setTypeName( String typeName ){
-        this.typeName = typeName;
-    }
-
-    public void setTypeClass( Class<?> typeClass ){
-        this.typeClass = typeClass;
-    }
-
-    public void setJavaType( int javaType ){
-        this.javaType = javaType;
-    }
-
-    public int getJavaType(){
-        if ( javaType != Integer.MIN_VALUE ){
-            return javaType;
-        }
-        return Util.getJavaType( getTypeName() );
     }
 }

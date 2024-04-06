@@ -1,13 +1,7 @@
 package com.wisecoders.dbschema.mongodb;
 
 import org.bson.Document;
-import org.bson.types.ObjectId;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.Date;
@@ -16,8 +10,9 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with  <a href="https://dbschema.com">DbSchema Database Designer</a>
- * Free to use by everyone, code modifications allowed only to the  <a href="https://github.com/wise-coders/mongodb-jdbc-driver">public repository</a>
+ * Copyright Wise Coders GmbH. The MongoDB JDBC driver is build to be used with DbSchema Database Designer https://dbschema.com
+ * Free to use by everyone, code modifications allowed only to
+ * the public repository https://github.com/wise-coders/mongodb-jdbc-driver
  */
 
 public class Util {
@@ -77,26 +72,16 @@ public class Util {
         return java.sql.Types.VARCHAR;
     }
 
-    public static Class getListElementsClass(Object obj){
+
+    public static boolean isListOfDocuments(Object obj){
         if ( obj instanceof List){
             List list = (List)obj;
-            Class cls = null;
             for ( Object val : list ){
-                Class _cls = null;
-                if ( val instanceof Map ) _cls = Map.class;
-                else if ( val instanceof Integer ) _cls = Integer.class;
-                else if ( val instanceof Double ) _cls = Double.class;
-                else if ( val instanceof Long ) _cls = Long.class;
-                else if ( val instanceof Boolean ) _cls = Boolean.class;
-                else if ( val instanceof Date ) _cls = Date.class;
-                else if ( val instanceof String ) _cls = String.class;
-                else if ( val instanceof ObjectId) _cls = ObjectId.class;
-                if ( cls == null ) cls = _cls;
-                else if ( cls != _cls ) cls = Object.class;
+                if ( !( val instanceof Map ) ) return false;
             }
-            return cls;
+            return list.size() > 0;
         }
-        return null;
+        return false;
     }
 
     public static String getBsonType(Document bsonDefinition){
@@ -108,18 +93,4 @@ public class Util {
         }
     }
 
-    public static String readStringFromInputStream(InputStream is) throws IOException {
-        if ( is == null ){
-            throw new IOException("Got empty Input Stream");
-        }
-        final BufferedReader in = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
-        final StringBuilder sb = new StringBuilder();
-        String str;
-        while (null != ((str = in.readLine()))) {
-            if (sb.length() > 0) sb.append("\n");
-            sb.append(str);
-        }
-        in.close();
-        return sb.toString();
-    }
 }
